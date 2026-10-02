@@ -1,0 +1,84 @@
+﻿/* ============================================================
+   ZYNORA-ML — Design Tokens
+   ============================================================ */
+:root {
+  /* ── Color ── */
+  --ink:            #0f1117;
+  --ink-soft:       #1e2130;
+  --ink-muted:      #3a3f52;
+  --surface:        #ffffff;
+  --surface-alt:    #f8f7f4;
+  --surface-warm:   #f2f0ea;
+  --border:         #e2e1dc;
+  --border-soft:    #eeede8;
+  --accent:         #c8a96e;
+  --accent-light:   #e8d5b0;
+  --accent-dark:    #a8893e;
+  --text-primary:   #0f1117;
+  --text-secondary: #4a4f62;
+  --text-muted:     #8a8f9e;
+  --text-inverse:   #f5f4f0;
+  --success:        #4a9e6b;
+  --warning:        #d4872a;
+  --error:          #c94a4a;
+  --info:           #4a7fc8;
+
+  /* ── Typography ── */
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --text-xs:   0.6875rem;
+  --text-sm:   0.8125rem;
+  --text-base: 1rem;
+  --text-lg:   1.125rem;
+  --text-xl:   1.25rem;
+  --text-2xl:  1.5rem;
+  --text-3xl:  1.875rem;
+  --text-4xl:  2.375rem;
+  --text-5xl:  3.25rem;
+  --text-6xl:  4rem;
+  --fw-light:    300;
+  --fw-normal:   400;
+  --fw-medium:   500;
+  --fw-semibold: 600;
+  --fw-bold:     700;
+  --track-tight:   -0.03em;
+  --track-normal:   0em;
+  --track-wide:     0.06em;
+  --track-wider:    0.12em;
+  --track-widest:   0.18em;
+
+  /* ── Spacing ── */
+  --sp-1:  0.25rem;
+  --sp-2:  0.5rem;
+  --sp-3:  0.75rem;
+  --sp-4:  1rem;
+  --sp-5:  1.25rem;
+  --sp-6:  1.5rem;
+  --sp-8:  2rem;
+  --sp-10: 2.5rem;
+  --sp-12: 3rem;
+  --sp-16: 4rem;
+  --sp-20: 5rem;
+  --sp-24: 6rem;
+
+  /* ── Border-radius ── */
+  --r-sm: 2px;
+  --r-md: 4px;
+  --r-lg: 8px;
+  --r-xl: 12px;
+  --r-full: 9999px;
+
+  /* ── Shadow ── */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+  --shadow-lg: 0 12px 32px rgba(0,0,0,0.12);
+
+  /* ── Transition ── */
+  --t-fast: 120ms ease;
+  --t-base: 200ms ease;
+  --t-slow: 350ms ease;
+
+  /* ── Layout ── */
+  --max-w:    1280px;
+  --nav-h:    64px;
+  --sidebar-w: 280px;
+}

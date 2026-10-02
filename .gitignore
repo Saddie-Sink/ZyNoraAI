@@ -1,0 +1,57 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+backend_*.log
+frontend_*.log
+
+# Node / Frontend build
+node_modules
+dist
+dist-ssr
+*.local
+
+# Python & Virtual Environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Testing & Jupyter
+.pytest_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+
+# Large raw training datasets (1.3+ GB)
+# Bengaluru_House_Data.csv is retained for auto-generating housing models
+backend/data/Structured3D/
+backend/data/resplan/
+
+# Blender backup files
+*.blend1
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
