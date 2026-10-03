@@ -2,8 +2,9 @@
  * ============================================================
  * ZYNORA — AI FLOOR PLAN & 3D DESIGN SERVICE
  * ============================================================
- * Direct AI Floor Plan & 3D synthesis service (decoupled from
- * legacy ML backend integration for instant, clean execution).
+ * Connects frontend directly to the ZyNoraAI Backend AI Architecture
+ * (/api/ai/requirements, /api/ai/generate-floorplan, /api/ai/modify, etc.)
+ * with automatic fallback to client-side pipeline if backend is offline.
  * ============================================================
  */
 import { DEMO_CANDIDATES, DEMO_EXTERIOR_VIEWS, DEMO_PROJECTS } from '../data/demoData';
@@ -15,6 +16,8 @@ import {
   buildQualityChecklistClient,
 } from './floorplanPipelineClient';
 import { parseFloorplanPromptWithGemini } from './ai3DRenderService';
+
+const BACKEND_BASE = 'http://127.0.0.1:8000';
 
 function respond(data) {
   return Promise.resolve({
@@ -28,6 +31,20 @@ function respond(data) {
  * 1. Project Management
  */
 export async function createProject(projectPayload) {
+  try {
+    const res = await fetch(`${BACKEND_BASE}/api/projects`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(projectPayload),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.data) return respond(json.data);
+    }
+  } catch {
+    // backend offline
+  }
+
   return respond({
     id: 'proj-' + Date.now().toString(36),
     ...projectPayload,
@@ -37,10 +54,28 @@ export async function createProject(projectPayload) {
 }
 
 export async function getProjects() {
+  try {
+    const res = await fetch(`${BACKEND_BASE}/api/projects`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.data) return respond(json.data);
+    }
+  } catch {
+    // backend offline
+  }
   return respond(DEMO_PROJECTS);
 }
 
 export async function getProjectById(projectId) {
+  try {
+    const res = await fetch(`${BACKEND_BASE}/api/projects/${projectId}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.data) return respond(json.data);
+    }
+  } catch {
+    // backend offline
+  }
   const found = DEMO_PROJECTS.find((p) => p.id === projectId) || DEMO_PROJECTS[0];
   return respond(found);
 }
@@ -49,6 +84,28 @@ export async function getProjectById(projectId) {
  * 2. AI Floor Plan Generation & Requirement Parsing
  */
 export async function parseRequirementsNL(prompt, projectPayload = {}) {
+  // Try Backend AI endpoint
+  try {
+    const res = await fetch(`${BACKEND_BASE}/api/ai/requirements`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, project: projectPayload }),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.success && json?.requirements) {
+        return respond({
+          structuredRequirements: json.requirements,
+          requirementValidation: json.requirementValidation || { isValid: true },
+          wizardSync: json.wizardSync || {},
+        });
+      }
+    }
+  } catch {
+    // backend offline
+  }
+
+  // Fallback to client NLP extractor
   const structured = extractRequirementsClient(prompt, projectPayload);
   const validation = validateRequirementsClient(structured);
   return respond({
@@ -59,6 +116,22 @@ export async function parseRequirementsNL(prompt, projectPayload = {}) {
 }
 
 export async function validateFloorplanGeometry(candidate, projectPayload = {}) {
+  try {
+    const res = await fetch(`${BACKEND_BASE}/api/floorplans/validate-geometry`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidate, project: projectPayload }),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.success && json?.data) {
+        return respond(json.data);
+      }
+    }
+  } catch {
+    // backend offline
+  }
+
   const structured = candidate?.structuredRequirements || extractRequirementsClient('', projectPayload);
   const siteW = Number(candidate?.siteBoundary?.width || structured?.site?.width || 30);
   const siteD = Number(candidate?.siteBoundary?.depth || structured?.site?.depth || 40);
@@ -94,6 +167,39 @@ export async function validateFloorplanGeometry(candidate, projectPayload = {}) 
 }
 
 export async function generateFloorplans(projectId, requirements) {
+  // 1. Try Backend AI pipeline: POST /api/ai/generate-floorplan
+  try {
+    const res = await fetch(`${BACKEND_BASE}/api/ai/generate-floorplan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: requirements?.nlPrompt || requirements?.prompt || '',
+        topK: 3,
+        project: requirements,
+      }),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.success && Array.isArray(json?.candidates) && json.candidates.length > 0) {
+        const cands = json.candidates;
+        const best = cands[0] || {};
+        return respond({
+          projectId,
+          candidates: cands,
+          count: cands.length,
+          bestCandidateId: best.id,
+          bestCandidateCode: best.code,
+          bestCandidateTitle: best.title,
+          structuredRequirements: json.requirements,
+          requirementValidation: json.requirementValidation,
+        });
+      }
+    }
+  } catch {
+    // backend offline, fall back to client pipeline
+  }
+
+  // Fallback to client generator
   const structured = extractRequirementsClient(requirements?.nlPrompt || '', requirements);
   const reqVal = validateRequirementsClient(structured);
   const preferredTypology = requirements?.preferredTypology || null;
@@ -146,7 +252,37 @@ export async function generateFloorplans(projectId, requirements) {
   });
 }
 
-export async function runAICopilot(prompt, projectPayload = {}, _currentCandidate = null) {
+export async function runAICopilot(prompt, projectPayload = {}, currentCandidate = null) {
+  // 1. Try Backend Conversational Edit endpoint: POST /api/ai/modify
+  if (currentCandidate) {
+    try {
+      const res = await fetch(`${BACKEND_BASE}/api/ai/modify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          candidate: currentCandidate,
+          project: projectPayload,
+        }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.success && json?.candidate) {
+          return respond({
+            candidates: [json.candidate],
+            bestCandidateId: json.candidate.id,
+            updatedProject: projectPayload,
+            summary: json.summary,
+            appliedOperations: json.appliedOperations,
+          });
+        }
+      }
+    } catch {
+      // backend offline
+    }
+  }
+
+  // Fallback to local mutation
   const lower = (prompt || '').toLowerCase();
   let preferredTypology = null;
 
@@ -203,6 +339,31 @@ export async function runAICopilot(prompt, projectPayload = {}, _currentCandidat
 }
 
 export async function uploadFloorplan(projectId, fileMeta) {
+  // If file is an image, try /api/ai/analyze-floorplan-image
+  if (fileMeta?.type?.startsWith('image/')) {
+    try {
+      const formData = new FormData();
+      formData.append('file', fileMeta);
+      const res = await fetch(`${BACKEND_BASE}/api/ai/analyze-floorplan-image`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return respond({
+          projectId,
+          fileName: fileMeta.name,
+          status: 'PARSED_VECTOR',
+          candidates: json.candidates,
+          bestCandidateId: json.bestCandidateId,
+          imageAnalysis: json.imageAnalysis,
+        });
+      }
+    } catch {
+      // backend offline
+    }
+  }
+
   return respond({
     projectId,
     fileName: fileMeta.name,
@@ -218,6 +379,27 @@ export async function getFloorplanById(candidateId) {
 }
 
 export async function renderArchVizViews(candidateId) {
+  try {
+    const res = await fetch(`${BACKEND_BASE}/api/render/views`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: candidateId }),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.data?.views) {
+        return respond({
+          renderJobId: json.data.renderJobId,
+          status: json.data.status,
+          blenderDetected: json.data.blenderDetected,
+          views: json.data.views,
+        });
+      }
+    }
+  } catch {
+    // backend offline
+  }
+
   return respond({
     renderJobId: 'job-archviz-' + candidateId,
     status: 'COMPLETED',
@@ -225,7 +407,23 @@ export async function renderArchVizViews(candidateId) {
   });
 }
 
-export async function renderWithBlender() {
+export async function renderWithBlender(candidateMeta = {}) {
+  try {
+    const res = await fetch(`${BACKEND_BASE}/api/render/blender`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(candidateMeta),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.data) {
+        return respond(json.data);
+      }
+    }
+  } catch {
+    // backend offline
+  }
+
   return respond({
     status: 'COMPLETED',
     views: DEMO_EXTERIOR_VIEWS,

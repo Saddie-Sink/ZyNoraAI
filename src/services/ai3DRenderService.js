@@ -522,8 +522,39 @@ async function generateZeroKeyFallback(imageDataUrl, prompt, seed = 42) {
  * 2D floor plan prompts into structured architectural requirements.
  */
 export async function parseFloorplanPromptWithGemini(promptText, apiKey = '') {
+  if (!promptText?.trim()) return null;
+
+  // 1. Primary: Try Backend AI Requirements endpoint (safely uses backend GEMINI_API_KEY)
+  try {
+    const backendRes = await fetch('http://127.0.0.1:8000/api/ai/requirements', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: promptText }),
+    });
+    if (backendRes.ok) {
+      const json = await backendRes.json();
+      if (json?.success && json?.requirements) {
+        const req = json.requirements;
+        return {
+          bedrooms: req.room_counts?.bedrooms || 3,
+          bathrooms: req.room_counts?.bathrooms || 2,
+          floors: req.number_of_floors || 1,
+          siteWidth: req.plot_width || 30,
+          siteLength: req.plot_depth || 40,
+          orientation: req.orientation || 'East',
+          hasPooja: Boolean(req.room_counts?.pooja),
+          hasParking: Boolean(req.parking?.required || req.room_counts?.parking),
+          hasBalcony: Boolean(req.balcony?.required || req.room_counts?.balcony),
+          preferredTypology: req.courtyard?.required ? 'atrium' : 'balanced',
+        };
+      }
+    }
+  } catch {
+    // backend not running, proceed to direct fallback
+  }
+
   const resolvedKey = (apiKey || getStoredGeminiApiKey()).trim();
-  if (!resolvedKey || !promptText?.trim()) return null;
+  if (!resolvedKey) return null;
 
   try {
     const res = await fetch(GEMINI_INTERACTIONS_ENDPOINT, {

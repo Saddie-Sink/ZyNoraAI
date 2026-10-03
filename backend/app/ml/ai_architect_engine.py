@@ -152,24 +152,91 @@ class AIArchitecturalEngine:
             "compact": 1.5,
         }.get(svg_type, 2.0)
 
-        # Dynamic context bonus based on user prompt / plot size
+        # Dynamic context bonus based on user prompt / plot size / budget
         site_area = site_w * site_d
-        if site_area <= 1100 and svg_type in ("compact", "balanced"):
+        budget_dict = structured_reqs.get("budget", {}) or {}
+        budget_priority = str(budget_dict.get("priority", "")).lower()
+        src_prompt = str(structured_reqs.get("sourcePrompt", "")).lower()
+        has_courtyard_request = (
+            "courtyard" in src_prompt
+            or "atrium" in src_prompt
+            or "brahmasthana" in src_prompt
+            or any("courtyard" in str(r).lower() for r in structured_reqs.get("specialRequirements", []))
+        )
+        is_economy = (
+            budget_priority in ("economy", "budget", "affordable")
+            or "economy" in src_prompt
+            or "compact" in src_prompt
+            or (site_area <= 1100 and structured_reqs.get("floors", 1) == 1 and not has_courtyard_request)
+        )
+
+        site_shape = str(structured_reqs.get("site", {}).get("shape", "")).lower()
+        special_reqs_text = " ".join(str(r) for r in structured_reqs.get("specialRequirements", [])).lower()
+        is_segmented = (
+            "l_" in site_shape or "l-" in site_shape or site_shape == "l_shape"
+            or "elder" in special_reqs_text or "elder" in src_prompt
+            or "dual wing" in src_prompt or "wing" in src_prompt
+            or "privacy" in special_reqs_text
+        )
+
+        if is_economy:
+            if svg_type == "compact":
+                typology_fit_bonus += 5.5
+            elif svg_type == "balanced":
+                typology_fit_bonus += 3.5
+            elif svg_type == "atrium" and not has_courtyard_request:
+                typology_fit_bonus -= 4.0
+        elif is_segmented:
+            if svg_type == "segmented":
+                typology_fit_bonus += 6.0
+            elif svg_type == "atrium" and not has_courtyard_request:
+                typology_fit_bonus -= 3.0
+        elif site_area <= 1100 and svg_type in ("compact", "balanced"):
             typology_fit_bonus += 2.5
         elif site_area >= 1500 and svg_type in ("atrium", "segmented"):
             typology_fit_bonus += 2.0
 
-        req_match = int(round(min(99.0, max(86.0, 91.0 * (0.5 * bed_match + 0.5 * bath_match) + typology_fit_bonus))))
+        req_match = int(round(min(99.0, max(84.0, 91.0 * (0.5 * bed_match + 0.5 * bath_match) + typology_fit_bonus))))
 
         # Composite AI Architectural Quality Score
-        composite = (
-            0.24 * req_match
-            + 0.20 * vastu_score
-            + 0.18 * conn_score
-            + 0.14 * proportion_score
-            + 0.12 * eff_score
-            + 0.12 * ((light_score + vent_score) / 2.0)
-        )
+        if is_economy:
+            # Emphasize spatial efficiency and proportion over expansive courtyard
+            composite = (
+                0.28 * req_match
+                + 0.14 * vastu_score
+                + 0.16 * conn_score
+                + 0.14 * proportion_score
+                + 0.20 * eff_score
+                + 0.08 * ((light_score + vent_score) / 2.0)
+            )
+            if svg_type == "compact":
+                composite += 3.5
+            elif svg_type == "balanced":
+                composite += 2.0
+            elif svg_type == "atrium" and not has_courtyard_request:
+                composite -= 4.5
+        elif is_segmented:
+            composite = (
+                0.26 * req_match
+                + 0.16 * vastu_score
+                + 0.20 * conn_score
+                + 0.14 * proportion_score
+                + 0.12 * eff_score
+                + 0.12 * ((light_score + vent_score) / 2.0)
+            )
+            if svg_type == "segmented":
+                composite += 4.5
+            elif svg_type == "atrium" and not has_courtyard_request:
+                composite -= 3.5
+        else:
+            composite = (
+                0.24 * req_match
+                + 0.20 * vastu_score
+                + 0.18 * conn_score
+                + 0.14 * proportion_score
+                + 0.12 * eff_score
+                + 0.12 * ((light_score + vent_score) / 2.0)
+            )
         quality_score = int(round(min(99.0, max(82.0, composite))))
 
         # Build human-readable AI Architect Rationale

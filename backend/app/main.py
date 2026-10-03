@@ -24,6 +24,15 @@ WATCH FOR THESE LOGS ON STARTUP:
   ✅ KMeans Silhouette Score: 0.XXX
   ✅ Models saved to backend/models/
 """
+import os
+import sys
+from pathlib import Path
+
+# Ensure repo root is on sys.path regardless of whether invoked from root or backend/
+_root_dir = str(Path(__file__).resolve().parent.parent.parent)
+if _root_dir not in sys.path:
+    sys.path.insert(0, _root_dir)
+
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,6 +44,7 @@ from backend.app.api.routes_floorplans import router as floorplans_router
 from backend.app.api.routes_ml import router as ml_router
 from backend.app.api.routes_design import router as design_router
 from backend.app.api.routes_render import router as render_router
+from backend.app.api.routes_ai import router as ai_router
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +106,7 @@ app.include_router(floorplans_router,prefix=settings.API_PREFIX)
 app.include_router(ml_router,        prefix=settings.API_PREFIX)
 app.include_router(design_router,    prefix=settings.API_PREFIX)
 app.include_router(render_router,    prefix=settings.API_PREFIX)
+app.include_router(ai_router,        prefix=settings.API_PREFIX)
 
 
 @app.get("/health")
@@ -124,6 +135,11 @@ def health_check():
         "version":       settings.VERSION,
         "mlCoreStatus":  ml_status,
         "endpoints": {
+            "aiStatus":           f"{settings.API_PREFIX}/ai/status",
+            "aiGenerate":         f"{settings.API_PREFIX}/ai/generate-floorplan",
+            "aiRequirements":     f"{settings.API_PREFIX}/ai/requirements",
+            "aiModify":           f"{settings.API_PREFIX}/ai/modify",
+            "aiImageAnalysis":    f"{settings.API_PREFIX}/ai/analyze-floorplan-image",
             "generateFloorplans": f"{settings.API_PREFIX}/floorplans/generate",
             "mlModelInfo":        f"{settings.API_PREFIX}/ml/model-info",
             "vastuAnalysis":      f"{settings.API_PREFIX}/ml/vastu-analysis",

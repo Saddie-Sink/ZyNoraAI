@@ -23,6 +23,7 @@ HOW TO TEST MANUALLY:
 from fastapi import APIRouter, UploadFile, File
 from typing import Dict, Any
 
+from backend.app.core.config import settings
 from backend.app.ml.floorplan_generator import FloorplanGenerator
 from backend.app.ml.model_registry import ModelRegistry
 from backend.app.ml.nlp_requirement_extractor import NLPRequirementExtractor
@@ -141,7 +142,8 @@ def run_ai_copilot(payload: Dict[str, Any]):
     prompt = payload.get("prompt") or payload.get("command") or ""
     project = dict(payload.get("project") or payload)
     current_cand = payload.get("currentCandidate")
-    api_key = payload.get("apiKey") or payload.get("geminiApiKey")
+    # API key is read strictly from backend environment configuration
+    api_key = settings.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY", "")
 
     copilot_result = generator.ai_engine.run_ai_copilot(
         prompt=prompt,

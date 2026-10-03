@@ -518,6 +518,7 @@ class NLPRequirementExtractor:
                 "entranceDirection": entrance_dir,
             },
             "floors": floors,
+            "budget": payload.get("budget", {}) or {},
             "targetBuiltUpArea": target_built_up,
             "requiredRooms": required_rooms,
             "parking": {

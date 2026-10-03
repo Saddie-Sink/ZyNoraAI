@@ -21,10 +21,11 @@ def generate_gemini_3d(payload: Dict[str, Any]):
     Generate a 3D Floor Plan Cutaway render using Google Gemini 3.1 Flash Image
     (`gemini-3.1-flash-image`) via the official Gemini Interactions API.
     """
+    from backend.app.core.config import settings
+
     api_key = (
-        payload.get("apiKey")
+        settings.GEMINI_API_KEY
         or os.environ.get("GEMINI_API_KEY")
-        or os.environ.get("GOOGLE_API_KEY")
         or ""
     ).strip()
 
